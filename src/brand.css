@@ -1,0 +1,25 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   PER-PROJECT BRAND OVERRIDE — the ONE file a consuming project edits to re-theme.
+
+   The shared kit's components reference brand-* utilities (bg-brand-500, text-brand-500,
+   …) which compile to var(--color-brand-*). Redefining those variables here re-skins the
+   whole kit without touching kit code — so `propagate --kit-only` can overwrite index.css
+   and every kit dir safely, and a project's identity survives the sync.
+
+   This file is PROJECT-OWNED: the propagation tool never overwrites it. Change only the
+   hex values below. Default = the basis indigo.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --color-brand-25: #f2f7ff;
+  --color-brand-50: #ecf3ff;
+  --color-brand-100: #dde9ff;
+  --color-brand-200: #c2d6ff;
+  --color-brand-300: #9cb9ff;
+  --color-brand-400: #7592ff;
+  --color-brand-500: #465fff;
+  --color-brand-600: #3641f5;
+  --color-brand-700: #2a31d8;
+  --color-brand-800: #252dae;
+  --color-brand-900: #262e89;
+  --color-brand-950: #161950;
+}
