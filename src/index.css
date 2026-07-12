@@ -191,6 +191,37 @@ layer(base);
   body {
     @apply relative font-normal font-outfit z-1 bg-gray-50;
   }
+
+  /*
+    Form controls don't inherit `color` from the page like other text does — browsers give
+    input/textarea/select their own UA-stylesheet text color (effectively black), so when the
+    kit's `dark:` background/border classes flip an app to dark mode, typed text stays black on a
+    dark field unless every single usage remembers to add `dark:text-white/90` itself. The kit's
+    own InputField/TextArea/Select components do that by hand already; this is the default for
+    everything else (raw <input>/<textarea>/<select> in consuming apps). Same pattern as the
+    border-color fix above: a utility class on the element (any explicit `text-*`/`dark:text-*`)
+    still wins, since class selectors beat this rule's element selector — nothing here needs to
+    change for components that already set their own color.
+  */
+  input,
+  textarea,
+  select {
+    @apply text-gray-800 dark:text-white/90;
+  }
+
+  /*
+    Native <select> (and date/time input) popups are rendered by the OS/browser, outside normal
+    CSS control — Tailwind's dark: classes on the closed control do nothing for the OPEN dropdown
+    list, which then falls back to the browser's light-mode default (white background), producing
+    white-on-white text once a `dark:text-white/90` class (set above) is also in play. `color-
+    scheme` is the standards-based fix: it tells the browser which palette to render native form
+    controls in, popup included, without fighting individual <option> background/color rules that
+    most browsers ignore for the open list anyway.
+  */
+  .dark select,
+  .dark input {
+    color-scheme: dark;
+  }
 }
 
 @utility menu-item {

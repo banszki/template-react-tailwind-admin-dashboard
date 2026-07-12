@@ -1,5 +1,12 @@
 import { useRef, useEffect } from "react";
 
+// Shared across every mounted <Modal>, not per-instance state: without this, two simultaneously-
+// open modals (e.g. a confirmation dialog opened from within another modal) would race on
+// `document.body.style.overflow` — the first modal to close resets it to "unset" unconditionally,
+// silently un-locking body scroll even though a second modal is still open. Reference-counted so
+// the lock only lifts when the LAST open modal closes.
+let _openModalCount = 0;
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -36,14 +43,14 @@ export const Modal: React.FC<ModalProps> = ({
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-
+    if (!isOpen) return;
+    _openModalCount += 1;
+    document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = "unset";
+      _openModalCount = Math.max(0, _openModalCount - 1);
+      if (_openModalCount === 0) {
+        document.body.style.overflow = "unset";
+      }
     };
   }, [isOpen]);
 

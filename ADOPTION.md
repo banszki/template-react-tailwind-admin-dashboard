@@ -28,6 +28,11 @@ import { AppLayout, ScrollToTop, NotFound, PageMeta, Badge, Modal, Table, useMod
 export const siteConfig: SiteConfig = {
   brand: { name: "My App", mark: "◈" },
   navItems: [{ icon: <GridIcon />, name: "Dashboard", path: "/" }],
+  // optional secondary nav — rendered under an "Others" heading, visually separated from navItems.
+  // Use it for settings/account/admin-style pages you don't want competing with the app's daily
+  // pages for primary-nav space (first real use: app-ai-home-manager's "Privacy & data" page,
+  // 2026-07-02 — the other two pilots declare `othersItems: []`/omit it entirely).
+  othersItems: [{ icon: <LockIcon />, name: "Privacy & data", path: "/privacy" }],
 };
 
 // 2) wrap the app
@@ -40,16 +45,41 @@ after the kit styles. Dark mode is automatic.
 ## Setting up a consuming app (the mechanics)
 
 The kit resolves to the sibling repo's `src` via a path-mapped dependency (the npm-world equivalent
-of `llm-pool`'s path-import). Four small pieces:
+of `llm-pool`'s path-import). Six small pieces:
 
-1. **`vite.config.ts`** — alias + React dedupe:
+1. **`vite.config.ts`** — alias + dedupe:
    ```ts
    resolve: {
      alias: { "@platform/web-kit": resolve(import.meta.dirname, "../../template-react-tailwind-admin-dashboard/src") },
-     dedupe: ["react", "react-dom"],
+     dedupe: ["react", "react-dom", "react-router"],
    }
    ```
-2. **`tsconfig.app.json`** — path map (incl. unifying React types across the app + the aliased kit):
+   **`react-router` must be in the dedupe list too**, not just `react`/`react-dom` — the kit's
+   `AppLayout` (`<Outlet/>`) and your app's own `<Router/>`/`<Routes/>` both import `react-router`;
+   since the kit is aliased straight to this repo's `src/` (not an npm package), an un-deduped
+   build can resolve two separate module instances, so the kit's `<Outlet/>` and your `<Router/>`
+   don't share context. Hit twice independently (app-evergreen-ai, then app-ai-home-manager) — both
+   times as a **silently blank page in the production build, no console error at all** (not the
+   usual "useLocation outside Router" throw), which makes it easy to burn a long debugging session
+   on. If your app renders blank with zero console output, check this first.
+2. **`src/svg.d.ts`** — the icon barrel imports every icon as `"./name.svg?react"` (vite-plugin-svgr's
+   named-export mode, configured alongside the kit's own alias in step 1). TypeScript needs an
+   ambient module declaration to typecheck that import shape — write it with a **type-only** import,
+   not `import React = require("react")`:
+   ```ts
+   declare module "*.svg?react" {
+     import type { FC, SVGProps } from "react";
+     export const ReactComponent: FC<SVGProps<SVGSVGElement>>;
+     const src: string;
+     export default src;
+   }
+   ```
+   The `require()`-style version trips `@typescript-eslint/no-require-imports` — a real, twice-
+   shipped bug (this kit's own `src/svg.d.ts` had it until 2026-07-08; so did
+   `app-platform-portfolio-HQ`'s copy), see `governance/patterns.md`'s svg.d.ts entry. Each app owns
+   its own copy of this file (it's app-scaffold, not kit surface — TypeScript's ambient-file
+   inclusion is scoped to your own `tsconfig.app.json`'s `include`, so you can't inherit the kit's).
+3. **`tsconfig.app.json`** — path map (incl. unifying React types across the app + the aliased kit):
    ```json
    "baseUrl": ".",
    "paths": {
@@ -60,15 +90,28 @@ of `llm-pool`'s path-import). Four small pieces:
      "react/jsx-runtime":  ["./node_modules/@types/react/jsx-runtime"]
    }
    ```
-3. **`src/index.css`** — pull in the kit's Tailwind theme/base/classes and scan both the kit + this app:
+4. **`src/index.css`** — pull in the kit's Tailwind theme/base/classes and scan both the kit + this app:
    ```css
    @import "../../../template-react-tailwind-admin-dashboard/src/index.css";
    @source "../../../template-react-tailwind-admin-dashboard/src";
    @source "./";
    ```
    (then `import "./brand.css"` after `index.css` in `main.tsx`.)
-4. **`package.json`** — the app needs the kit's runtime deps it bundles (react, react-dom, react-router,
+5. **`package.json`** — the app needs the kit's runtime deps it bundles (react, react-dom, react-router,
    apexcharts, react-apexcharts, clsx, tailwind-merge, react-helmet-async, flatpickr) plus `@types/node`.
+6. **`Makefile`** — a real compile+lint check. Not kit-wiring like 1-5, but do it anyway: `npm`/`npx`
+   are allowlisted through the org's meta-gateway v2 (`workspace.run_command`) but don't actually
+   resolve through it on Windows — see `governance/patterns.md`'s gateway npm/npx resolution gap
+   entry. `docker` does resolve, so run the check in a throwaway container against your already-
+   installed `node_modules`:
+   ```makefile
+   verify-web:
+   	docker run --rm -v C:\Code:/code -w /code/<your-app>/web node:20-alpine node node_modules/typescript/bin/tsc -b --noEmit
+   	docker run --rm -v C:\Code:/code -w /code/<your-app>/web node:20-alpine node node_modules/eslint/bin/eslint.js src
+   ```
+   Run `make verify-web` after every frontend change before calling it done — this is what actually
+   catches type drift and lint errors when working through an AI agent on this gateway; manual
+   review alone has already let real bugs through (see `governance/patterns.md`).
 
 That's it — `import { … } from "@platform/web-kit"` now resolves to the one kit source.
 

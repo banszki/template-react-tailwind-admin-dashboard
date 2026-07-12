@@ -27,6 +27,9 @@ export { Modal } from "./components/ui/modal";
 export { Dropdown } from "./components/ui/dropdown/Dropdown";
 export { DropdownItem } from "./components/ui/dropdown/DropdownItem";
 export { Table, TableHeader, TableBody, TableRow, TableCell } from "./components/ui/table";
+export { default as Card } from "./components/ui/card/Card";
+export { default as StatCard } from "./components/ui/card/StatCard";
+export { default as DatePicker } from "./components/form/date-picker";
 
 // Generic pages
 export { default as NotFound } from "./pages/OtherPage/NotFound";
