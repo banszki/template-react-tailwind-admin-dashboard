@@ -34,5 +34,23 @@ export { default as DatePicker } from "./components/form/date-picker";
 // Generic pages
 export { default as NotFound } from "./pages/OtherPage/NotFound";
 
+// Chat family — the standardized AI chat surface (sidebar + message + input + panel).
+// State is owned by the consuming page; the kit provides pure presentational
+// components. The data shapes (ChatConversation, ChatPanelMessage) are
+// LLM-compatible, so streaming responses drop in without reshape.
+export {
+  ChatSidebar,
+  ChatMessage,
+  ChatInput,
+  ChatPanel,
+  type ChatSidebarProps,
+  type ChatConversation,
+  type ChatMessageProps,
+  type ChatMessageRole,
+  type ChatInputProps,
+  type ChatPanelProps,
+  type ChatPanelMessage,
+} from "./components/chat";
+
 // Icon set
 export * from "./icons";
