@@ -60,6 +60,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   return (
     <div
       data-testid={rest["data-testid"]}
+      data-streaming={streaming ? "true" : "false"}
       className={`flex w-full gap-3 ${isUser ? "flex-row-reverse" : "flex-row"} ${className}`}
     >
       <div

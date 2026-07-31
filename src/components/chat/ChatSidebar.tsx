@@ -6,6 +6,10 @@ export interface ChatConversation {
   title: string;
   /** ISO timestamp of the most recent message (used to sort the list). */
   updated_at: string;
+  /** Optional: 1-line preview of the most recent message. The sidebar
+   *  shows this below the title so the user can see "what was this chat
+   *  about?" without clicking in. Empty string = don't render the row. */
+  last_message_preview?: string;
 }
 
 export interface ChatSidebarProps {
@@ -72,13 +76,21 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelect(c.id)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
+                    className={`flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left text-sm transition ${
                       isActive
                         ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
                         : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.04]"
                     }`}
                   >
-                    <span className="truncate">{c.title}</span>
+                    <span className="truncate font-medium">{c.title}</span>
+                    {c.last_message_preview ? (
+                      <span
+                        data-testid="chat-sidebar-preview"
+                        className="truncate text-xs font-normal text-gray-500 dark:text-gray-400"
+                      >
+                        {c.last_message_preview}
+                      </span>
+                    ) : null}
                   </button>
                   <button
                     type="button"
