@@ -1,8 +1,13 @@
 {
   "name": "@platform/web-kit",
-  "private": true,
+  "private": false,
   "version": "0.2.0",
   "type": "module",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE.md"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./index.css": "./src/index.css",
@@ -23,7 +28,9 @@
     "react-dom": "^19.0.0",
     "react-dropzone": "^14.3.5",
     "react-helmet-async": "^2.0.5",
+    "react-markdown": "^9.0.1",
     "react-router": "^7.1.5",
+    "remark-gfm": "^4.0.0",
     "tailwind-merge": "^3.0.1"
   },
   "devDependencies": {
