@@ -72,9 +72,8 @@ Found 2026-07-08 the first time this kit's own `npm run lint` actually ran throu
 deleting the redundant `src/svg.d.ts` (kept `vite-env.d.ts`, the correct declaration, as the sole
 source). **Every consuming app still needs its own correct copy** — TypeScript's ambient-file
 inclusion is scoped to each app's own `tsconfig.app.json` `include`, so fixing it here does not
-reach already-scaffolded apps. `app-platform-testing-HQ` is known to still have the broken version
-as of 2026-07-08 (found, not yet fixed — out of scope for the session that found it). See
-`ADOPTION.md` step 2 for the correct snippet every app should carry.
+reach already-scaffolded apps. See `ADOPTION.md` step 2 for the correct snippet every app should
+carry.
 
 ## The hidden native date-input pitfall (real, `DatePicker` existed but was never exported)
 

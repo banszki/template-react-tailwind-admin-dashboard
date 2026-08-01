@@ -7,3 +7,5 @@ export {
   type Node,
   type Relationship,
 } from "./Neo4jGraphView";
+export { DEFAULT_LAYOUTS, ZOOM_STEP } from "./constants";
+export { defaultSearchMatcher } from "./search";

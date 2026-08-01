@@ -1,5 +1,8 @@
 export {
   Neo4jGraphView,
+  DEFAULT_LAYOUTS,
+  ZOOM_STEP,
+  defaultSearchMatcher,
   type Neo4jGraphViewProps,
   type Neo4jGraphViewHandle,
   type Neo4jGraphLayout,

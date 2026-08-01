@@ -1,181 +1,163 @@
-import { forwardRef, useEffect, useRef, useImperativeHandle, type CSSProperties } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { InteractiveNvlWrapper } from "@neo4j-nvl/react";
-import type NVL from "@neo4j-nvl/base";
-import type { Node, Relationship } from "@neo4j-nvl/base";
+import { Neo4jGraphHeader } from "./Neo4jGraphHeader";
+import { Neo4jGraphStatusBar } from "./Neo4jGraphStatusBar";
+import { Neo4jGraphOverlays } from "./Neo4jGraphOverlays";
+import {
+  type Neo4jGraphViewHandle,
+  type Neo4jGraphViewProps,
+  type NvlRefType,
+} from "./types";
+import { DEFAULT_LAYOUTS, ZOOM_STEP } from "./constants";
+import { defaultSearchMatcher } from "./search";
 
 /**
- * Neo4jGraphView — the standardized graph view for the platform.
+ * Neo4jGraphView v2 — the standardized, feature-rich graph view for the
+ * platform.
  *
- * The page is responsible for transforming its data into the NVL
- * `Node[]` + `Relationship[]` shape (the kit doesn't dictate a data
- * format). This component then renders the graph with consistent
- * styling (small captions, fit-on-load, muted edges) and exposes a
- * ref handle for advanced use (`fit()`, `setZoom()`, etc.).
+ * **What it ships (the "ready-to-go" UX):**
+ * - A header bar with title, subtitle, and a toolbar of action chips
+ *   (zoom +/−, fit, reset, layout switcher, fullscreen, export to PNG,
+ *   optional search). The toolbar is opt-out per feature.
+ * - A footer status bar with live node + edge counts and the active
+ *   layout. Useful at a glance for any graph.
+ * - A fullscreen mode (CSS-based overlay, no portal) that expands the
+ *   canvas to fill the viewport with a single click. Press Esc or click
+ *   the close button to exit.
+ * - Loading + empty + error overlays. Loading auto-shows for the first
+ *   250ms after data changes to mask the layout-settle flicker.
+ * - Keyboard shortcuts: F = fit, +/− = zoom, Esc = deselect, 0 = reset.
+ * - Smooth fit transitions via NVL's `fit(zoomOptions)` API.
  *
- * The component is the standardized "graph card" — it ships:
- *  - A consistent rounded-2xl border + padding wrapper
- *  - Small (canvas-rendered) captions so dense graphs stay readable
- *  - Muted edges (slate-300 by default) so nodes dominate
- *  - A `data-testid` so BDD tests can find the canvas
- *  - A `height` prop (default 460) so callers don't have to set
- *    inline styles
- *  - The NVL fit-on-load dance: NVL's `fit()` is called once the
- *    layout settles (via the `onLayoutDone` callback) so the graph
- *    is fully visible on first paint
- *  - A ref handle so callers can call `fit()`, `setZoom()`,
- *    `getSelectedNodes()`, etc. — anything NVL exposes
+ * **What the caller controls (the "feature-rich" part):**
+ * - All NVL data (nodes + rels with NVL's native shape — no proprietary
+ *   wrapper; the page transforms its data into NVL shape).
+ * - Initial layout + the set of layouts in the runtime switcher.
+ * - Initial zoom + height.
+ * - Optional selection highlighting (pass `selectedNodeId`).
+ * - Optional search bar (pass `showSearch`; default matcher matches the
+ *   node's `caption` case-insensitively).
+ * - Custom header actions slot for project-specific buttons.
+ * - Custom search matcher for richer filtering (e.g. multi-field).
+ * - Standard click/double-click/canvas-click handlers.
  *
- * The data shape: pass NVL's `Node[]` and `Relationship[]` directly.
- * We do NOT dictate a data format (Neo4j, plain, etc.) — that's the
- * caller's job. The QTC uses a Neo4j-native shape and transforms it
- * in the page; another project might use a different shape and do
- * the same.
+ * **The data shape is the contract.** Like the v1, the v2 does NOT
+ * dictate a data format. The caller transforms its data (Neo4j-native,
+ * plain, anything) into NVL's `Node[]` + `Relationship[]` shape. When
+ * the QTC's data store migrates to Neo4j, the SPA consumes the
+ * Cypher `RETURN n, r, m` shape directly — no transformation layer.
  *
- * Layouts supported (per NVL):
- *  - "hierarchical"   — DAGs with a clear prereq direction
- *  - "d3Force"        — general-purpose force-directed (the KBP)
- *  - "forceDirected"  — NVL's own force-directed (uses cytoscape fallback)
- *  - "circular"       — nodes on a circle
- *  - "grid"           — nodes on a grid
- *
- * Bundling: @neo4j-nvl/react is a peerDependency (optional) so
- * consumers who don't use this view don't pay the bundle cost.
- * Vite tree-shakes the import automatically when the component
- * isn't used.
- */
-
-// Re-export NVL's Node/Relationship types so callers don't need to
-// install @neo4j-nvl/base separately.
-export type { Node, Relationship } from "@neo4j-nvl/base";
-
-/** Layouts supported by NVL. Mirrors NVL's `Layout` union type. */
-export type Neo4jGraphLayout =
-  | "hierarchical"
-  | "d3Force"
-  | "forceDirected"
-  | "circular"
-  | "grid"
-  | "free";
-
-/** Options for the hierarchical layout. */
-export type HierarchicalOptions = {
-  direction?: "up" | "down" | "left" | "right";
-  packing?: "bin" | "stack";
-};
-
-export type Neo4jGraphViewProps = {
-  /** The nodes to render (NVL's `Node[]` shape). */
-  nodes: Node[];
-  /** The relationships to render (NVL's `Relationship[]` shape). */
-  rels: Relationship[];
-  /** The layout to use. Default: "d3Force". */
-  layout?: Neo4jGraphLayout;
-  /** Options for the hierarchical layout (no-op for other layouts). */
-  hierarchicalOptions?: HierarchicalOptions;
-  /** Initial zoom level. Default: 0.85 (graphs often need a small
-   * zoom-out to fit the viewport on first paint). */
-  initialZoom?: number;
-  /** The viewport height. Default: 460. */
-  height?: number;
-  /** A data-testid for BDD / e2e tests. */
-  "data-testid"?: string;
-  /** Optional CSS class on the wrapper. */
-  className?: string;
-  /** Optional inline style on the wrapper. */
-  style?: CSSProperties;
-  /** Whether the user can drag nodes. Default: false (read-only). */
-  allowDrag?: boolean;
-  /** Whether to disable NVL's segment analytics. Default: true. */
-  disableTelemetry?: boolean;
-  /** Called when a node is clicked. */
-  onNodeClick?: (node: Node) => void;
-  /** Called when the canvas is clicked. */
-  onCanvasClick?: () => void;
-  /** Called when NVL's layout settles. Useful for triggering
-   * additional side effects after the graph is stable. */
-  onLayoutDone?: () => void;
-};
-
-/**
- * The ref handle the parent can use to drive the graph imperatively.
- * Exposes the subset of NVL's API we expect consumers to need.
- */
-export type Neo4jGraphViewHandle = {
-  fit?: () => void;
-  setZoom?: (zoom: number) => void;
-  getZoom?: () => number;
-  resetZoom?: () => void;
-  deselectAll?: () => void;
-  getSelectedNodes?: () => Node[];
-  getNodes?: () => Node[];
-};
-
-/**
- * The standard graph view. See module docstring for usage.
- *
- * Example (QTC's KB Explorer):
- *   <Neo4jGraphView
- *     nodes={nvlNodes}
- *     rels={nvlRels}
- *     layout="d3Force"
- *     initialZoom={0.5}
- *     height={520}
- *     data-testid="kb-graph-canvas"
- *     onNodeClick={(node) => setSelectedId(node.id)}
- *   />
+ * **Bundling:** `@neo4j-nvl/react` remains a peerDependency (optional) so
+ * consumers who don't use this view don't pay the 1.25MB cost. Vite
+ * tree-shakes the import automatically when the component isn't used.
  */
 export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewProps>(
   function Neo4jGraphView(props, ref) {
     const {
+      // Data
       nodes,
       rels,
-      layout = "d3Force",
+      // Header
+      title,
+      subtitle,
+      hideHeader = false,
+      headerActions,
+      // Display
+      layout: initialLayout = "d3Force",
       hierarchicalOptions,
-      initialZoom = 0.85,
+      layouts = DEFAULT_LAYOUTS,
+      initialZoom = 1.0,
       height = 460,
-      className = "",
-      style,
+      fullWidth = true,
+      // Toolbar toggles
+      showZoomControls = true,
+      showLayoutSwitcher = true,
+      showFullscreenToggle = true,
+      showExport = true,
+      showSearch = false,
+      searchPlaceholder = "Search nodes…",
+      searchMatcher = defaultSearchMatcher,
+      // NVL toggles
       allowDrag = false,
       disableTelemetry = true,
+      autoFit = true,
+      forceCanvasRenderer = true,
+      // Selection / events
+      selectedNodeId = null,
       onNodeClick,
+      onNodeDoubleClick,
       onCanvasClick,
+      onLayoutChange,
       onLayoutDone,
+      // States
+      loading: loadingProp = false,
+      error = null,
+      emptyMessage = "No nodes to display.",
+      emptyHint,
+      // Visual
+      className = "",
+      style,
+      "data-testid": testId,
     } = props;
-    const testId = props["data-testid"];
 
-    const nvlRef = useRef<Partial<NVL> | null>(null);
-    // Guards fit-on-load so a user's manual pan/zoom isn't reset on
-    // every re-render. The guard clears when nodes/rels change so
-    // re-filters trigger a re-fit.
+    // ---- Local state ---------------------------------------------------
+    const [currentLayout, setCurrentLayout] = useState(initialLayout);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isInitialLayoutPending, setIsInitialLayoutPending] = useState(true);
+    const [currentZoom, setCurrentZoom] = useState<number | null>(initialZoom);
+
+    // ---- Refs ----------------------------------------------------------
+    const nvlRef = useRef<NvlRefType | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    // Guards fit-on-load so a user's manual pan/zoom isn't reset on every
+    // re-render. The guard clears when nodes/rels change so re-filters
+    // trigger a re-fit.
     const hasFit = useRef(false);
     const lastFitKey = useRef<string>("");
 
-    useImperativeHandle(ref, () => ({
-      fit: nvlRef.current?.fit,
-      setZoom: nvlRef.current?.setZoom,
-      getZoom: nvlRef.current?.getZoom,
-      resetZoom: nvlRef.current?.resetZoom,
-      deselectAll: nvlRef.current?.deselectAll,
-      getSelectedNodes: nvlRef.current?.getSelectedNodes,
-      getNodes: nvlRef.current?.getNodes,
-    }));
+    // ---- Search filtering ---------------------------------------------
+    // Filter nodes by the search query (case-insensitive). Rels are hidden
+    // if either endpoint is filtered out. The matching is client-side,
+    // the cost is O(n) per keystroke, which is fine for the KB's 140 nodes.
+    const { visibleNodes, visibleRels } = useMemo(() => {
+      if (!searchQuery.trim()) {
+        return { visibleNodes: nodes, visibleRels: rels };
+      }
+      const q = searchQuery.toLowerCase();
+      const matched = nodes.filter((n) => searchMatcher(n, q));
+      const matchedIds = new Set(matched.map((n) => n.id));
+      const filteredRels = rels.filter(
+        (r) => matchedIds.has(r.from) && matchedIds.has(r.to),
+      );
+      return { visibleNodes: matched, visibleRels: filteredRels };
+    }, [nodes, rels, searchQuery, searchMatcher]);
 
-    // Reset the fit-guard when the graph data changes. NVL's
-    // onLayoutDone callback then triggers a fresh fit. This means
-    // a re-filter (e.g., a domain filter) re-centers the graph.
+    // Reset fit-guard when the visible graph changes (data, filter, or
+    // re-mount). NVL's onLayoutDone callback then triggers a fresh fit.
+    // Re-filtering by search triggers a re-fit so the user always sees
+    // the matched subset centered.
     useEffect(() => {
-      const key = `${nodes.length}:${rels.length}`;
+      const key = `${visibleNodes.length}:${visibleRels.length}`;
       if (key !== lastFitKey.current) {
         hasFit.current = false;
         lastFitKey.current = key;
       }
-    }, [nodes, rels]);
+    }, [visibleNodes, visibleRels]);
 
-    // Belt + suspenders: a 1.5s fallback for d3Force (the layout
-    // worker can take a moment to settle). Hierarchical settles
-    // immediately, so the 1.5s is harmless for that case.
+    // Belt + suspenders: a 1.5s fallback for d3Force (the layout worker
+    // can take a moment to settle). Hierarchical settles immediately.
     useEffect(() => {
-      if (!nodes || nodes.length === 0) return;
+      if (!visibleNodes || visibleNodes.length === 0) return;
       const t = setTimeout(() => {
         if (!hasFit.current && nvlRef.current?.fit) {
           nvlRef.current.fit();
@@ -183,50 +165,329 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
         }
       }, 1500);
       return () => clearTimeout(t);
-    }, [nodes, rels]);
+    }, [visibleNodes, visibleRels]);
+
+    // Hide the "loading" overlay after a short delay so we don't flash it
+    // on every re-render — only on the first paint + after data changes.
+    useEffect(() => {
+      const t = setTimeout(() => setIsInitialLayoutPending(false), 250);
+      return () => clearTimeout(t);
+    }, [visibleNodes, visibleRels]);
+
+    // ---- Imperative handle (what parents can call) --------------------
+    useImperativeHandle(
+      ref,
+      () => ({
+        fit: (nodeIds?: string[]) => nvlRef.current?.fit?.(nodeIds as string[]),
+        setZoom: (zoom: number) => nvlRef.current?.setZoom?.(zoom),
+        getZoom: () => nvlRef.current?.getScale?.() ?? currentZoom ?? 1,
+        resetZoom: () => nvlRef.current?.resetZoom?.(),
+        deselectAll: () => nvlRef.current?.deselectAll?.(),
+        getSelectedNodes: () => nvlRef.current?.getSelectedNodes?.() ?? [],
+        getNodes: () => nvlRef.current?.getNodes?.() ?? visibleNodes,
+        setLayout: (next) => nvlRef.current?.setLayout?.(next),
+        zoomIn: () => {
+          const z = nvlRef.current?.getScale?.() ?? 1;
+          nvlRef.current?.setZoom?.(z + ZOOM_STEP);
+          setCurrentZoom(z + ZOOM_STEP);
+        },
+        zoomOut: () => {
+          const z = nvlRef.current?.getScale?.() ?? 1;
+          nvlRef.current?.setZoom?.(Math.max(0.1, z - ZOOM_STEP));
+          setCurrentZoom(Math.max(0.1, z - ZOOM_STEP));
+        },
+        saveAsPng: (filename = "graph.png") => {
+          nvlRef.current?.saveToFile?.({ filename });
+        },
+        toggleFullscreen: () => setIsFullscreen((s) => !s),
+      }),
+      [currentZoom, visibleNodes],
+    );
+
+    // ---- Handlers ------------------------------------------------------
+    const handleLayoutChange = useCallback(
+      (next: typeof currentLayout) => {
+        setCurrentLayout(next);
+        onLayoutChange?.(next);
+      },
+      [onLayoutChange],
+    );
+
+    const handleZoomIn = useCallback(() => {
+      const z = nvlRef.current?.getScale?.() ?? 1;
+      nvlRef.current?.setZoom?.(z + ZOOM_STEP);
+      setCurrentZoom(z + ZOOM_STEP);
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+      const z = nvlRef.current?.getScale?.() ?? 1;
+      nvlRef.current?.setZoom?.(Math.max(0.1, z - ZOOM_STEP));
+      setCurrentZoom(Math.max(0.1, z - ZOOM_STEP));
+    }, []);
+
+    const handleFit = useCallback(() => {
+      nvlRef.current?.fit?.();
+      hasFit.current = true;
+    }, []);
+
+    const handleReset = useCallback(() => {
+      nvlRef.current?.resetZoom?.();
+    }, []);
+
+    const handleExport = useCallback(() => {
+      nvlRef.current?.saveToFile?.({ filename: "graph.png" });
+    }, []);
+
+    const handleToggleFullscreen = useCallback(() => {
+      setIsFullscreen((s) => !s);
+    }, []);
+
+    const handleSearchChange = useCallback((q: string) => {
+      setSearchQuery(q);
+    }, []);
+
+    const handleNodeClick = useCallback(
+      (node: Node) => {
+        onNodeClick?.(node);
+      },
+      [onNodeClick],
+    );
+
+    const handleCanvasClick = useCallback(() => {
+      onCanvasClick?.();
+    }, [onCanvasClick]);
+
+    // ---- Keyboard shortcuts (active when container has focus) ---------
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        // Only react when no input is focused
+        const target = e.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.isContentEditable)
+        ) {
+          return;
+        }
+        if (e.key === "f" || e.key === "F") {
+          e.preventDefault();
+          handleFit();
+        } else if (e.key === "+" || e.key === "=") {
+          e.preventDefault();
+          handleZoomIn();
+        } else if (e.key === "-" || e.key === "_") {
+          e.preventDefault();
+          handleZoomOut();
+        } else if (e.key === "0") {
+          e.preventDefault();
+          handleReset();
+        } else if (e.key === "Escape") {
+          if (isFullscreen) {
+            setIsFullscreen(false);
+          } else {
+            nvlRef.current?.deselectAll?.();
+          }
+        }
+      },
+      [handleFit, handleZoomIn, handleZoomOut, handleReset, isFullscreen],
+    );
+
+    // ---- Selected-node styling -----------------------------------------
+    // When the caller passes `selectedNodeId`, we dim non-selected nodes
+    // and add a thicker outline on the selected one. This is the standard
+    // "focused" pattern: the eye finds the highlighted node instantly.
+    const styledNodes = useMemo(() => {
+      if (!selectedNodeId) return visibleNodes;
+      return visibleNodes.map((n) => {
+        if (n.id === selectedNodeId) {
+          return {
+            ...n,
+            selected: true,
+            // Outline: NVL uses `borderColor` (ring around the node)
+            // — amplify the visual when selected
+            ...(n as { borderColor?: string }).borderColor
+              ? {}
+              : { borderColor: "#3b82f6", borderWidth: 2.5 },
+          } as Node;
+        }
+        // Dim non-selected: NVL's node opacity is on the `opacity` field
+        return { ...n, opacity: 0.35 } as Node;
+      });
+    }, [visibleNodes, selectedNodeId]);
+
+    // ---- Loading / empty / error visibility ---------------------------
+    const isLoading = loadingProp || isInitialLayoutPending;
+    const isEmpty = !isLoading && !error && visibleNodes.length === 0;
+
+    // ---- Render --------------------------------------------------------
+    const wrapperClass = [
+      "flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white",
+      "dark:border-gray-800 dark:bg-gray-900",
+      isFullscreen ? "fixed inset-0 z-50 rounded-none border-0" : "",
+      className,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const wrapperStyle: CSSProperties = isFullscreen
+      ? { ...style }
+      : { height, width: fullWidth ? "100%" : undefined, ...style };
 
     return (
       <div
+        ref={containerRef}
         data-testid={testId}
-        className={
-          "overflow-hidden rounded-2xl border border-gray-200 bg-white " +
-          "dark:border-gray-800 dark:bg-white/[0.03] " +
-          className
-        }
-        style={{ height, ...style }}
+        className={wrapperClass}
+        style={wrapperStyle}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        role="application"
+        aria-label={typeof title === "string" ? title : "Graph visualization"}
       >
-        <InteractiveNvlWrapper
-          ref={nvlRef}
-          nodes={nodes}
-          rels={rels}
-          nvlOptions={{
-            layout,
-            ...(layout === "hierarchical" && hierarchicalOptions
-              ? { hierarchicalLayoutOptions: hierarchicalOptions }
-              : {}),
-            initialZoom,
-            allowDrag,
-            disableTelemetry,
-          }}
-          nvlCallbacks={{
-            onLayoutDone: () => {
-              if (!hasFit.current && nvlRef.current?.fit) {
-                nvlRef.current.fit();
-                hasFit.current = true;
-              }
-              onLayoutDone?.();
-            },
-          }}
-          mouseEventCallbacks={{
-            onNodeClick: onNodeClick
-              ? (node: Node) => onNodeClick(node)
-              : () => undefined,
-            onCanvasClick: onCanvasClick
-              ? () => onCanvasClick()
-              : () => undefined,
-          }}
+        {!hideHeader && (
+          <Neo4jGraphHeader
+            title={title}
+            subtitle={subtitle}
+            headerActions={headerActions}
+            currentLayout={currentLayout}
+            availableLayouts={layouts}
+            onLayoutChange={handleLayoutChange}
+            showZoomControls={showZoomControls}
+            showLayoutSwitcher={showLayoutSwitcher}
+            showFullscreenToggle={showFullscreenToggle}
+            showExport={showExport}
+            showSearch={showSearch}
+            searchPlaceholder={searchPlaceholder}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            isFullscreen={isFullscreen}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onFit={handleFit}
+            onReset={handleReset}
+            onExport={handleExport}
+            onToggleFullscreen={handleToggleFullscreen}
+          />
+        )}
+
+        <div className="relative flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
+          <InteractiveNvlWrapper
+            ref={nvlRef}
+            nodes={styledNodes}
+            rels={visibleRels}
+            nvlOptions={{
+              layout: currentLayout,
+              ...(currentLayout === "hierarchical" && hierarchicalOptions
+                ? { hierarchicalLayoutOptions: hierarchicalOptions }
+                : {}),
+              initialZoom,
+              allowDrag,
+              disableTelemetry,
+              ...(forceCanvasRenderer ? { renderer: "canvas" } : {}),
+            }}
+            nvlCallbacks={{
+              onLayoutDone: () => {
+                if (autoFit && !hasFit.current && nvlRef.current?.fit) {
+                  nvlRef.current.fit();
+                  hasFit.current = true;
+                }
+                // Update zoom indicator after layout settles
+                const z = nvlRef.current?.getScale?.();
+                if (typeof z === "number") setCurrentZoom(z);
+                onLayoutDone?.();
+              },
+            }}
+            mouseEventCallbacks={{
+              onNodeClick: onNodeClick
+                ? (node: Node) => handleNodeClick(node)
+                : () => undefined,
+              onNodeDoubleClick: onNodeDoubleClick
+                ? (node: Node) => onNodeDoubleClick(node)
+                : () => undefined,
+              onCanvasClick: onCanvasClick
+                ? () => handleCanvasClick()
+                : () => undefined,
+            }}
+          />
+
+          {/* Floating zoom controls (bottom-right, also accessible via keyboard) */}
+          {showZoomControls && !isEmpty && (
+            <div
+              data-testid={testId ? `${testId}-zoom-controls` : "nvl-zoom-controls"}
+              className="absolute bottom-3 right-3 flex flex-col gap-1 rounded-xl border border-gray-200 bg-white/95 p-1 shadow-theme-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/90"
+            >
+              <ZoomButton
+                label="Zoom in"
+                glyph="+"
+                onClick={handleZoomIn}
+                testId={`${testId ?? "nvl"}-zoom-in`}
+              />
+              <ZoomButton
+                label="Zoom out"
+                glyph="−"
+                onClick={handleZoomOut}
+                testId={`${testId ?? "nvl"}-zoom-out`}
+              />
+              <ZoomButton
+                label="Fit to screen"
+                glyph="⤢"
+                onClick={handleFit}
+                testId={`${testId ?? "nvl"}-fit`}
+              />
+              <ZoomButton
+                label="Reset zoom"
+                glyph="↺"
+                onClick={handleReset}
+                testId={`${testId ?? "nvl"}-reset`}
+              />
+            </div>
+          )}
+
+          <Neo4jGraphOverlays
+            isLoading={isLoading}
+            isEmpty={isEmpty}
+            error={error}
+            emptyMessage={emptyMessage}
+            emptyHint={emptyHint}
+          />
+        </div>
+
+        <Neo4jGraphStatusBar
+          nodeCount={visibleNodes.length}
+          relCount={visibleRels.length}
+          totalNodeCount={nodes.length}
+          totalRelCount={rels.length}
+          currentLayout={currentLayout}
+          currentZoom={currentZoom}
+          selectedNodeId={selectedNodeId}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
         />
       </div>
     );
   },
 );
+
+// ---- Internal: small icon button for the floating zoom controls -----
+type ZoomButtonProps = {
+  label: string;
+  glyph: string;
+  onClick: () => void;
+  testId?: string;
+};
+
+function ZoomButton({ label, glyph, onClick, testId }: ZoomButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      data-testid={testId}
+      className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+    >
+      {glyph}
+    </button>
+  );
+}

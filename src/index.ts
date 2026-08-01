@@ -53,15 +53,22 @@ export {
 } from "./components/chat";
 
 // Graph family — the standardized Neo4j graph view (per the 2026-08-01
-// promotion of the QTC's graph work to the platform). Renders NVL
-// (the official Neo4j Visualization Library) with consistent styling
-// and a fit-on-load dance. The consuming page owns the data transform
-// (NVL's Node[] + Relationship[]) and the surrounding details panel;
-// the kit owns the canvas, the caption sizing, and the fit-to-viewport
+// promotion of the QTC's graph work to the platform, then v2 promoted
+// to a full-featured component with header + toolbar + status bar +
+// overlays). Renders NVL (the official Neo4j Visualization Library) with
+// consistent styling, a fit-on-load dance, on-screen zoom controls, a
+// layout switcher, fullscreen mode, optional search, optional
+// selection-dim, and keyboard shortcuts. The consuming page owns the
+// data transform (NVL's Node[] + Relationship[]) and the surrounding
+// details panel; the kit owns the canvas, the caption sizing, the
+// toolbar, the status bar, the overlays, and the fit-to-viewport
 // behavior. @neo4j-nvl/react is an optional peer dep so consumers
 // who don't use the graph view don't pay the bundle cost.
 export {
   Neo4jGraphView,
+  DEFAULT_LAYOUTS,
+  ZOOM_STEP,
+  defaultSearchMatcher,
   type Neo4jGraphViewProps,
   type Neo4jGraphViewHandle,
   type Neo4jGraphLayout,
