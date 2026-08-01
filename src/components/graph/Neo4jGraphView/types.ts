@@ -89,7 +89,15 @@ export type Neo4jGraphViewProps = {
   searchMatcher?: (node: Node, query: string) => boolean;
 
   // ===== NVL behavior toggles ==========================================
-  /** Whether the user can drag nodes. Default: false. */
+  /** Whether the user can drag the canvas with the mouse (click + hold + drag).
+   *  Default: true. NVL's PanInteraction is enabled by default; this prop
+   *  controls whether we expose the affordance (cursor + hint) — the
+   *  underlying NVL behavior is the same either way. */
+  pannable?: boolean;
+  /** Whether the user can drag individual nodes with the mouse. Default: true
+   *  in v2 (was false in v1; flipping the default is part of the
+   *  "ready-to-go, mature UX" promotion — graph IDE tools let users move
+   *  nodes around, that's expected). */
   allowDrag?: boolean;
   /** Whether to disable NVL's segment analytics. Default: true. */
   disableTelemetry?: boolean;

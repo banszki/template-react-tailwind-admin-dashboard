@@ -87,7 +87,8 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
       searchPlaceholder = "Search nodes…",
       searchMatcher = defaultSearchMatcher,
       // NVL toggles
-      allowDrag = false,
+      pannable = true,
+      allowDrag = true,
       disableTelemetry = true,
       autoFit = true,
       forceCanvasRenderer = true,
@@ -114,6 +115,7 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
     const [searchQuery, setSearchQuery] = useState("");
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isInitialLayoutPending, setIsInitialLayoutPending] = useState(true);
+    const [isDragging, setIsDragging] = useState(false);
     const [currentZoom, setCurrentZoom] = useState<number | null>(initialZoom);
 
     // ---- Refs ----------------------------------------------------------
@@ -371,7 +373,19 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
           />
         )}
 
-        <div className="relative flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
+        <div
+          className={
+            "relative flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950 " +
+            (pannable
+              ? isDragging
+                ? "cursor-grabbing"
+                : "cursor-grab"
+              : "cursor-default")
+          }
+          onMouseDown={() => pannable && setIsDragging(true)}
+          onMouseUp={() => setIsDragging(false)}
+          onMouseLeave={() => setIsDragging(false)}
+        >
           <InteractiveNvlWrapper
             ref={nvlRef}
             nodes={styledNodes}
@@ -441,6 +455,23 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
                 onClick={handleReset}
                 testId={`${testId ?? "nvl"}-reset`}
               />
+            </div>
+          )}
+
+          {/* Subtle drag-to-pan affordance hint (bottom-left, opposite the
+              zoom controls). Always visible but very low-contrast so it
+              doesn't compete with the canvas. The keyboard shortcut hint
+              in the status bar covers the keyboard case. */}
+          {pannable && !isEmpty && (
+            <div
+              data-testid={testId ? `${testId}-pan-hint` : "nvl-pan-hint"}
+              className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-white/70 px-2 py-1 text-[10px] font-medium text-gray-500 shadow-sm backdrop-blur dark:bg-gray-900/70 dark:text-gray-400"
+            >
+              {isDragging ? (
+                <span className="text-brand-600 dark:text-brand-300">Panning…</span>
+              ) : (
+                <span>Drag to pan · scroll to zoom{allowDrag ? " · drag nodes to move" : ""}</span>
+              )}
             </div>
           )}
 
