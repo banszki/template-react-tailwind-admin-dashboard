@@ -124,6 +124,18 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
     // ---- Refs ----------------------------------------------------------
     const nvlRef = useRef<NvlRefType | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
+    // Backup canvas-click detection (NVL's ClickInteraction suppresses
+    // onCanvasClick if the mouse moved >10px between mousedown and
+    // mouseup — see @neo4j-nvl/interaction-handlers/click-interaction.js
+    // and constants.js:DRAG_THRESHOLD=10. Real clicks routinely move
+    // more than 10px, so the user's onCanvasClick never fires. We do
+    // our own detection on the wrapper with a 5px threshold + NVL's
+    // getHits() to determine what was clicked. This fires reliably.
+    const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
+    // Tracks whether the current press turned into a pan. If so, we
+    // skip the click check on mouseup (the user was dragging, not
+    // clicking).
+    const pannedThisPress = useRef(false);
     // Guards fit-on-load so a user's manual pan/zoom isn't reset on every
     // re-render. The guard clears when nodes/rels change so re-filters
     // trigger a re-fit.
@@ -262,6 +274,82 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
       onCanvasClick?.();
     }, [onCanvasClick]);
 
+    // ---- Backup canvas-click detection (bypasses NVL's 10px threshold) -
+    /**
+     * NVL's ClickInteraction suppresses `onCanvasClick` if the mouse
+     * moved more than 10px between mousedown and mouseup. Real clicks
+     * routinely move more than 10px (especially on touchpads), so the
+     * consumer's onCanvasClick never fires and selection is "sticky".
+     *
+     * The fix: do our own click detection on the wrapper div with a
+     * more generous 5px threshold, then call NVL's `getHits()` to
+     * figure out what was clicked. If the up-position is on the
+     * canvas (no node/relationship hit), fire `onCanvasClick` —
+     * duplicating NVL's behavior, but reliably.
+     *
+     * We track a `pannedThisPress` flag via the PanInteraction's
+     * `onPan` callback (wired below in mouseEventCallbacks). If the
+     * press turned into a pan, we skip the click check on mouseup.
+     */
+    const handleWrapperMouseDown = useCallback(
+      (e: React.MouseEvent<HTMLDivElement>) => {
+        // Ignore clicks on the floating zoom controls / header actions /
+        // search input — those have their own click handlers. Only track
+        // presses that originate on the canvas surface itself.
+        const target = e.target as HTMLElement | null;
+        if (target && target !== e.currentTarget) {
+          // Walk up to see if the click is inside the canvas (the
+          // InteractiveNvlWrapper renders a div with a <canvas> inside).
+          // If we find a canvas ancestor, treat it as a canvas click;
+          // otherwise it's a UI control click — skip.
+          let node: HTMLElement | null = target;
+          let foundCanvas = false;
+          while (node && node !== e.currentTarget) {
+            if (node.tagName === "CANVAS") {
+              foundCanvas = true;
+              break;
+            }
+            node = node.parentElement;
+          }
+          if (!foundCanvas) return;
+        }
+        if (pannable) setIsDragging(true);
+        mouseDownPos.current = { x: e.clientX, y: e.clientY };
+        pannedThisPress.current = false;
+      },
+      [pannable],
+    );
+
+    const handleWrapperMouseUp = useCallback(
+      (e: React.MouseEvent<HTMLDivElement>) => {
+        setIsDragging(false);
+        if (!onCanvasClick) return; // consumer didn't opt in
+        const start = mouseDownPos.current;
+        mouseDownPos.current = null;
+        if (!start) return;
+        if (pannedThisPress.current) return; // it was a drag, not a click
+        const dx = Math.abs(e.clientX - start.x);
+        const dy = Math.abs(e.clientY - start.y);
+        // 5px threshold (NVL uses 10px; we use a tighter one to catch
+        // more real-world clicks)
+        if (dx > 5 || dy > 5) return;
+        // Check what was clicked. If no node/rel, fire onCanvasClick.
+        try {
+          const nvl = nvlRef.current;
+          if (!nvl?.getHits) return;
+          const hits = nvl.getHits(e as unknown as MouseEvent);
+          const nodes = hits.nvlTargets?.nodes ?? [];
+          const rels = hits.nvlTargets?.relationships ?? [];
+          if (nodes.length === 0 && rels.length === 0) {
+            onCanvasClick();
+          }
+        } catch {
+          // NVL not initialized or getHits failed — ignore
+        }
+      },
+      [onCanvasClick],
+    );
+
     // ---- Keyboard shortcuts (active when container has focus) ---------
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
@@ -385,9 +473,13 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
                 : "cursor-grab"
               : "cursor-default")
           }
-          onMouseDown={() => pannable && setIsDragging(true)}
-          onMouseUp={() => setIsDragging(false)}
-          onMouseLeave={() => setIsDragging(false)}
+          onMouseDown={handleWrapperMouseDown}
+          onMouseUp={handleWrapperMouseUp}
+          onMouseLeave={() => {
+            setIsDragging(false);
+            mouseDownPos.current = null;
+            pannedThisPress.current = false;
+          }}
         >
           <InteractiveNvlWrapper
             ref={nvlRef}
@@ -434,9 +526,10 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
               // callbacks here to force-create all 3, then surface the
               // real events to the consumer's onPan / onNodeDragStart /
               // onNodeDragEnd if they care.
-              onPan: onPan
-                ? (pan: { x: number; y: number }) => onPan(pan)
-                : () => undefined,
+              onPan: (pan: { x: number; y: number }) => {
+                pannedThisPress.current = true;
+                if (onPan) onPan(pan);
+              },
               onZoom: () => undefined,
               onZoomAndPan: () => undefined,
               onDrag: () => undefined,
