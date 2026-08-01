@@ -116,6 +116,17 @@ export type Neo4jGraphViewProps = {
   onNodeDoubleClick?: (node: Node) => void;
   /** Called when the canvas (background) is clicked. */
   onCanvasClick?: () => void;
+  /**
+   * Called when the user pans the view (click+drag on background).
+   * Note: the pan interaction is always enabled (when `pannable` is
+   * true); this callback is for consumers who want to react to pan
+   * events (e.g. hide a "use the mouse" hint after first pan).
+   */
+  onPan?: (pan: { x: number; y: number }) => void;
+  /** Called when the user starts dragging a node. */
+  onNodeDragStart?: (node: Node) => void;
+  /** Called when the user finishes dragging a node. */
+  onNodeDragEnd?: (node: Node) => void;
   /** Called when the user changes the layout via the switcher. */
   onLayoutChange?: (layout: Neo4jGraphLayout) => void;
   /** Called when NVL's layout settles. */

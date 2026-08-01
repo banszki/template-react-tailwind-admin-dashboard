@@ -97,6 +97,9 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
       onNodeClick,
       onNodeDoubleClick,
       onCanvasClick,
+      onPan,
+      onNodeDragStart,
+      onNodeDragEnd,
       onLayoutChange,
       onLayoutDone,
       // States
@@ -421,6 +424,27 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
                 : () => undefined,
               onCanvasClick: onCanvasClick
                 ? () => handleCanvasClick()
+                : () => undefined,
+              // NVL's @neo4j-nvl/react ONLY instantiates an interaction if
+              // a callback is provided for it (see hooks.js:useInteraction:
+              // "if (callback === true || typeof callback === 'function')").
+              // Without a callback, the PanInteraction/ZoomInteraction/
+              // DragNodeInteraction is never constructed, so pan / wheel-
+              // zoom / drag-node simply do nothing. We pass no-op
+              // callbacks here to force-create all 3, then surface the
+              // real events to the consumer's onPan / onNodeDragStart /
+              // onNodeDragEnd if they care.
+              onPan: onPan
+                ? (pan: { x: number; y: number }) => onPan(pan)
+                : () => undefined,
+              onZoom: () => undefined,
+              onZoomAndPan: () => undefined,
+              onDrag: () => undefined,
+              onDragStart: onNodeDragStart
+                ? (node: Node) => onNodeDragStart(node)
+                : () => undefined,
+              onDragEnd: onNodeDragEnd
+                ? (node: Node) => onNodeDragEnd(node)
                 : () => undefined,
             }}
           />
