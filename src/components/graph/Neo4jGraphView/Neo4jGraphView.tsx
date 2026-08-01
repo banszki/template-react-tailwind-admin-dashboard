@@ -390,24 +390,44 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
     // When the caller passes `selectedNodeId`, we dim non-selected nodes
     // and add a thicker outline on the selected one. This is the standard
     // "focused" pattern: the eye finds the highlighted node instantly.
+    //
+    // Important: we ALWAYS set `selected: true | false` explicitly on
+    // every node (never omit the field). NVL's diff treats
+    // `{selected: true}` → `{selected: undefined}` as a change, but
+    // some NVL versions render the selection ring from an internal
+    // map keyed by node.id — passing `selected: undefined` doesn't
+    // always clear it (the 2026-08-01 "white circular shadow remains"
+    // bug). Explicit `selected: false` is reliable.
     const styledNodes = useMemo(() => {
-      if (!selectedNodeId) return visibleNodes;
       return visibleNodes.map((n) => {
-        if (n.id === selectedNodeId) {
-          return {
-            ...n,
-            selected: true,
-            // Outline: NVL uses `borderColor` (ring around the node)
-            // — amplify the visual when selected
-            ...(n as { borderColor?: string }).borderColor
-              ? {}
-              : { borderColor: "#3b82f6", borderWidth: 2.5 },
-          } as Node;
+        const isThisSelected = !!selectedNodeId && n.id === selectedNodeId;
+        const next: Node = { ...n, selected: isThisSelected };
+        if (isThisSelected) {
+          // Outline: NVL uses `borderColor` (ring around the node)
+          // — amplify the visual when selected.
+          if (!(n as { borderColor?: string }).borderColor) {
+            (next as { borderColor?: string }).borderColor = "#3b82f6";
+            (next as { borderWidth?: number }).borderWidth = 2.5;
+          }
+        } else if (selectedNodeId) {
+          // We have a selection but this isn't it: dim the peers
+          (next as { opacity?: number }).opacity = 0.35;
         }
-        // Dim non-selected: NVL's node opacity is on the `opacity` field
-        return { ...n, opacity: 0.35 } as Node;
+        return next;
       });
     }, [visibleNodes, selectedNodeId]);
+
+    // Safety net for NVL's internal selection state. The diff-based
+    // update path should clear the highlight when we pass
+    // `selected: false`, but in some NVL paths the visual selection
+    // ring is drawn from a separate internal map and isn't cleared by
+    // a prop update. Calling `nvl.deselectAll()` synchronously with
+    // the deselect guarantees the ring disappears. Belt + suspenders.
+    useEffect(() => {
+      if (selectedNodeId == null && nvlRef.current?.deselectAll) {
+        nvlRef.current.deselectAll();
+      }
+    }, [selectedNodeId]);
 
     // ---- Loading / empty / error visibility ---------------------------
     const isLoading = loadingProp || isInitialLayoutPending;
