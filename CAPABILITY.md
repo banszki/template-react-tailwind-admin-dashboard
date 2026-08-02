@@ -1,47 +1,23 @@
-# Capability — Web UI kit
+# This repo is `@platform/web-kit`'s source — not a CoE
 
-Triad status, consumers and graduation triggers. Pattern:
-[SMHQ capability triad](../strategy-software-manufacturing-headquarters/capabilities/CATALOG.md).
+*Corrected 2026-07-15.*
 
-> This repo predates the `strategy-*`-prefixed CoE convention (it's a fork of an external template,
-> `TailAdmin React Free`, not a greenfield SMHQ repo) and has no `strategy-` prefix — the estate's
-> `registry.py` heuristic (CoE ⇔ has `CAPABILITY.md` OR a `strategy-` prefix) would not auto-classify
-> it as a CoE without this file. Added 2026-07-06 alongside `governance/` to close that gap; before
-> this, classification relied on a manual override in `app-platform-portfolio-HQ/seed.py`.
+**Governance for this kit lives in
+[`strategy-web-excellence`](../strategy-web-excellence/CAPABILITY.md)**, not here. This file used
+to be a byte-identical copy of that repo's `CAPABILITY.md` (down to a `Governance | governance/`
+row pointing at a `governance/` folder that has **never existed in this repo**) — a real drift,
+corrected now rather than perpetuated.
 
-## Modes
+## What this repo actually is
 
-| Mode | Where now | Target home | Maturity |
-|------|-----------|-------------|----------|
-| **Governance** | [`governance/`](governance/) | here | active |
-| **Library** (`@platform/web-kit`) | [`src/`](src/) | dedicated versioned package + `devops-nexus` | active (imported by 3 pilots; copy-and-sync retired) |
-| **Service** | — | n/a | not applicable — a static UI kit has no runtime service face |
+A fork of **TailAdmin React Free**, kept as a standing **external-development proxy**: `src/` here
+holds the estate's shared `@platform/web-kit` UI kit (layout, theme, components, icons), and this
+repo stays a distinct fork specifically so upstream TailAdmin changes can be pulled and ported in
+over time — director's call, 2026-07-15. It is the **Library** face of the web-kit capability triad;
+the **Governance** face (patterns, the adoption guide, consumer list, graduation triggers) is
+authored and maintained in `strategy-web-excellence`, the CoE.
 
-## Consumers (drives the promotion rule)
-
-- `app-platform-testing-HQ` — teal brand, imports via Vite/tsconfig alias.
-- `app-ai-home-manager` — green brand; first user of `othersItems` (secondary nav), 2026-07-02.
-- `app-evergreen-ai` — emerald brand cockpit; origin of the `Card`/`StatCard` extraction and the
-  `react-router` dedupe pitfall (see `governance/patterns.md`).
-- `app-platform-portfolio-HQ` — brand cockpit for the portfolio-management HQ itself; missing from
-  this list until 2026-07-08 (a real drift — the repo has imported the kit since its own Slice 1,
-  the consumer count here just never caught up). Origin of the gateway npm/npx resolution gap entry
-  (see `governance/patterns.md`).
-
-**4 consumers → Rule of Three met (since the 3rd).** Nexus package split is the committed next ceremony (see
-`ADOPTION.md`'s "Graduation" section) — not yet executed, same pending state as every other active
-capability in the estate.
-
-## Graduation triggers
-
-- **Library → own repo + Nexus:** met (3 consumers). Path-aliased until the split is scheduled.
-- **Service:** not applicable — nothing to graduate.
-
-## Stable contract
-
-- The kit's public surface is `src/index.ts` — layout/chrome (`AppLayout`), providers/hooks
-  (`ThemeProvider`, `SiteConfigProvider`, `useModal`, `useGoBack`), UI primitives (`Button`, `Badge`,
-  `Alert`, `Avatar`, `Modal`, `Dropdown`, `Table`, `Card`, `StatCard`), the icon set, and `NotFound`.
-- Parameterized by `SiteConfig` (brand, nav items, optional secondary nav) — the app provides it via
-  `<SiteConfigProvider value={...}>`, not a magic project file.
-- Full adoption mechanics: [`ADOPTION.md`](ADOPTION.md).
+Read [`strategy-web-excellence/CAPABILITY.md`](../strategy-web-excellence/CAPABILITY.md) for the
+full triad status, and [`strategy-web-excellence/ADOPTION.md`](../strategy-web-excellence/ADOPTION.md)
+for how a project consumes this kit — both canonical there, not duplicated here, to stop the two
+repos drifting against each other the way this file just had to be caught doing.
