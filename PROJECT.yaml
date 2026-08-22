@@ -1,0 +1,32 @@
+# Machine-readable project manifest. Standard: SMHQ standards/project-structure.md.
+# Classified per DR-2026-038 + B-0062 (2026-08-22, cohort audit of the
+# remaining "Other"-layer items).
+id: template-react-tailwind-admin-dashboard
+name: Template React Tailwind Admin Dashboard
+type: library
+archetype: capability     # SMHQ standards/maturity-archetypes.md §1 — the Library face of the web-kit triad
+
+# Per CAPABILITY.md + ADOPTION.md (both corrected 2026-07-15), this
+# repo is the **Library face** of the web-kit capability triad. The
+# package.json publishes `@platform/web-kit` v0.2.0 — a fork of
+# TailAdmin React Free kept as a standing external-development proxy
+# (director's call, 2026-07-15). The CoE (strategy-web-excellence)
+# owns governance + adoption; this repo owns the source.
+status: active
+owner: platform-team
+
+# === 7-field classification (per DR-2026-038 + B-0062, 2026-08-22) ===
+# Layer: Product (a versioned, published npm package with real consumers
+# in the Foundry. The allowed-layer set is {Core, CoE, Product, Other} per
+# foundry.py:44; "Library" is not an allowed layer value, so the Library
+# face is classified as Product — the vision statement names the role).
+# Stage: mature (v0.2.0 is the current version; the Library/Governance
+# split is clean post 2026-07-15).
+# p_code: graduated (the package is shipped + consumed).
+# risk_band: core (it's the canonical web substrate of the Foundry).
+layer: Product
+p_code: graduated
+stage: mature
+risk_band: core
+org: foundry-direct
+vision: "Template React Tailwind Admin Dashboard is the Library face of the web-kit capability triad: the actual source of @platform/web-kit v0.2.0 (a fork of TailAdmin React Free kept as a standing external-development proxy per the 2026-07-15 director's call). The CoE (strategy-web-excellence) owns governance + adoption; this repo owns the source. Success metric: ≥ 3 real Foundry products import @platform/web-kit via npm (or its published path) + the TailAdmin upstream can still be pulled + the Library/Governance split stays clean (no byte-identical governance copies)."
