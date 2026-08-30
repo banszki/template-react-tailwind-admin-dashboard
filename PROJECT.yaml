@@ -30,3 +30,16 @@ stage: mature
 risk_band: core
 org: foundry-direct
 vision: "Template React Tailwind Admin Dashboard is the Library face of the web-kit capability triad: the actual source of @platform/web-kit v0.2.0 (a fork of TailAdmin React Free kept as a standing external-development proxy per the 2026-07-15 director's call). The CoE (strategy-web-excellence) owns governance + adoption; this repo owns the source. Success metric: ≥ 3 real Foundry products import @platform/web-kit via npm (or its published path) + the TailAdmin upstream can still be pulled + the Library/Governance split stays clean (no byte-identical governance copies)."
+
+# === Role system (the CoE governance layer; added by coe_role_adopt) ===
+# The adoption state: when this project joined, who maintains the
+# discipline, and the most recent audit summary. See the gateway's
+# `roles.coe_role_adopt` tool for the auto-writer; see
+# strategy-ai-agentic-excellence/roles/DOCTRINE.md for the doctrine.
+roles:
+  adopted_at: '2026-08-30T13:20:16.225465+00:00'
+  director_charter: 'DIRECTOR_CHARTER.md'
+  weekly_audit_member: True
+  coe_root: 'C:\\Code\\foundry\\strategy-ai-agentic-excellence'
+  all_5_roles_healthy: True
+  last_audit: '2026-08-30T13:20:16.289836+00:00'
