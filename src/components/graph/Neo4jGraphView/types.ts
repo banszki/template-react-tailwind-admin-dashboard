@@ -176,4 +176,4 @@ export type Neo4jGraphViewHandle = {
 };
 
 /** Internal: ref to the underlying NVL instance. */
-export type NvlRefType = Partial<NVL>;
+export type NvlRefType = NVL;

@@ -9,6 +9,7 @@ import {
   type CSSProperties,
 } from "react";
 import { InteractiveNvlWrapper } from "@neo4j-nvl/react";
+import type { Node } from "@neo4j-nvl/base";
 import { Neo4jGraphHeader } from "./Neo4jGraphHeader";
 import { Neo4jGraphStatusBar } from "./Neo4jGraphStatusBar";
 import { Neo4jGraphOverlays } from "./Neo4jGraphOverlays";
@@ -177,7 +178,7 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
       if (!visibleNodes || visibleNodes.length === 0) return;
       const t = setTimeout(() => {
         if (!hasFit.current && nvlRef.current?.fit) {
-          nvlRef.current.fit();
+          nvlRef.current.fit([]);
           hasFit.current = true;
         }
       }, 1500);
@@ -243,7 +244,7 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
     }, []);
 
     const handleFit = useCallback(() => {
-      nvlRef.current?.fit?.();
+      nvlRef.current?.fit?.([]);
       hasFit.current = true;
     }, []);
 
@@ -508,17 +509,16 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
             nvlOptions={{
               layout: currentLayout,
               ...(currentLayout === "hierarchical" && hierarchicalOptions
-                ? { hierarchicalLayoutOptions: hierarchicalOptions }
+                ? { layoutOptions: hierarchicalOptions }
                 : {}),
               initialZoom,
-              allowDrag,
               disableTelemetry,
               ...(forceCanvasRenderer ? { renderer: "canvas" } : {}),
             }}
             nvlCallbacks={{
               onLayoutDone: () => {
                 if (autoFit && !hasFit.current && nvlRef.current?.fit) {
-                  nvlRef.current.fit();
+                  nvlRef.current.fit([]);
                   hasFit.current = true;
                 }
                 // Update zoom indicator after layout settles
@@ -553,12 +553,16 @@ export const Neo4jGraphView = forwardRef<Neo4jGraphViewHandle, Neo4jGraphViewPro
               onZoom: () => undefined,
               onZoomAndPan: () => undefined,
               onDrag: () => undefined,
-              onDragStart: onNodeDragStart
-                ? (node: Node) => onNodeDragStart(node)
-                : () => undefined,
-              onDragEnd: onNodeDragEnd
-                ? (node: Node) => onNodeDragEnd(node)
-                : () => undefined,
+              onDragStart: allowDrag
+                ? onNodeDragStart
+                  ? (nodes: Node[]) => onNodeDragStart(nodes[0])
+                  : () => undefined
+                : false,
+              onDragEnd: allowDrag
+                ? onNodeDragEnd
+                  ? (nodes: Node[]) => onNodeDragEnd(nodes[0])
+                  : () => undefined
+                : false,
             }}
           />
 
