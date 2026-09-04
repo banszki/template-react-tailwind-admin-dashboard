@@ -1,11 +1,23 @@
-import { useState } from "react";
+import { useState, type SelectHTMLAttributes } from "react";
 
 interface Option {
   value: string;
   label: string;
 }
 
-interface SelectProps {
+// Extends React's full <select> attribute surface (B-019). Consumers can
+// pass `disabled`, `onFocus`, `onBlur`, `name`, `id`, `aria-*`, `required`,
+// `autoFocus`, `form`, `tabIndex`, `title`, etc. and they flow through to
+// the underlying <select>. The `onChange` is Omitted because the kit
+// deliberately narrows it to a string-only callback (the existing 0.3.1
+// API consumers rely on); the native signature is `ChangeEventHandler`,
+// which is incompatible with a string-only callback. The local
+// `className`/`value`/`onChange`/`defaultValue` props are still typed
+// narrowly (consumer can override the kit's `className` only by
+// spreading their own, which the destructure removes). Additive
+// non-breaking for 0.3.1 callers; closes the structural fix for the 6
+// disabled wrappers in PHQ (B-021 follow-on drops the wrappers).
+interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChange"> {
   options: Option[];
   placeholder?: string;
   onChange: (value: string) => void;
@@ -27,6 +39,8 @@ const Select: React.FC<SelectProps> = ({
   className = "",
   defaultValue = "",
   value,
+  disabled,
+  ...rest
 }) => {
   // Controlled vs uncontrolled (0.3.1). When `value` is provided, the parent
   // owns the state — we render exactly what they pass and do NOT touch
@@ -53,6 +67,8 @@ const Select: React.FC<SelectProps> = ({
       } ${className}`}
       value={selectedValue}
       onChange={handleChange}
+      disabled={disabled}
+      {...rest}
     >
       {/* Placeholder option */}
       <option
