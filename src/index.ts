@@ -30,6 +30,7 @@ export { Table, TableHeader, TableBody, TableRow, TableCell } from "./components
 export { default as Card } from "./components/ui/card/Card";
 export { default as StatCard } from "./components/ui/card/StatCard";
 export { default as DatePicker } from "./components/form/date-picker";
+export { default as Select } from "./components/form/Select";
 
 // Generic pages
 export { default as NotFound } from "./pages/OtherPage/NotFound";
