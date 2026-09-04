@@ -11,6 +11,7 @@ interface SelectProps {
   onChange: (value: string) => void;
   className?: string;
   defaultValue?: string;
+  value?: string;
 }
 
 // Dark-mode-safe <option> styling (B-014). Chrome/Windows paints each <option>'s background/text
@@ -25,14 +26,22 @@ const Select: React.FC<SelectProps> = ({
   onChange,
   className = "",
   defaultValue = "",
+  value,
 }) => {
-  // Manage the selected value
-  const [selectedValue, setSelectedValue] = useState<string>(defaultValue);
+  // Controlled vs uncontrolled (0.3.1). When `value` is provided, the parent
+  // owns the state — we render exactly what they pass and do NOT touch
+  // internal state. When `value` is undefined, fall back to internal state
+  // seeded from `defaultValue` (the original 0.3.0 behavior; preserved
+  // unchanged for backward compatibility — existing uncontrolled callers
+  // work without any modification).
+  const isControlled = value !== undefined;
+  const [internalValue, setInternalValue] = useState<string>(defaultValue);
+  const selectedValue = isControlled ? value : internalValue;
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setSelectedValue(value);
-    onChange(value); // Trigger parent handler
+    const newValue = e.target.value;
+    if (!isControlled) setInternalValue(newValue);
+    onChange(newValue); // Always notify the parent
   };
 
   return (
