@@ -2,9 +2,44 @@ import { useState } from "react";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { Link } from "react-router";
+import { useSiteConfig } from "../../context/SiteConfigContext";
+
+/**
+ * The default avatar: a neutral silhouette.
+ *
+ * Drawn by the kit, so it needs no file from the consuming app - which
+ * matters because the published package does not ship a `public/` directory
+ * for a consumer to copy an asset out of.
+ */
+function DefaultAvatar() {
+  return (
+    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500">
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
+      </svg>
+    </span>
+  );
+}
 
 export default function UserDropdown() {
+  const { user } = useSiteConfig();
   const [isOpen, setIsOpen] = useState(false);
+
+  const name = user?.name?.trim() ?? "";
+  const email = user?.email?.trim() ?? "";
+  const avatar = user?.avatar?.trim() ?? "";
+
+  // There is an identity to act on only when the app configured one.
+  const hasIdentity = Boolean(name || email);
+  // The account menu (profile, settings, sign out) belongs to an app that
+  // HAS accounts. A single-user local app gets the avatar and nothing else.
+  const showMenu = user?.menu !== false && hasIdentity;
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -13,17 +48,35 @@ export default function UserDropdown() {
   function closeDropdown() {
     setIsOpen(false);
   }
+
+  const avatarElement = avatar ? (
+    <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
+      <img src={avatar} alt="" className="h-full w-full object-cover" />
+    </span>
+  ) : (
+    <span className="mr-3">
+      <DefaultAvatar />
+    </span>
+  );
+
+  if (!showMenu) {
+    // No account to act on: a plain silhouette, no name, no menu, no links.
+    return <div className="relative flex items-center">{avatarElement}</div>;
+  }
+
   return (
     <div className="relative">
       <button
         onClick={toggleDropdown}
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
-        <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-          <img src="/images/user/owner.jpg" alt="User" />
-        </span>
+        {avatarElement}
 
-        <span className="block mr-1 font-medium text-theme-sm">Musharof</span>
+        {name && (
+          <span className="block mr-1 font-medium text-theme-sm">
+            {name.split(" ")[0]}
+          </span>
+        )}
         <svg
           className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${
             isOpen ? "rotate-180" : ""
@@ -49,14 +102,20 @@ export default function UserDropdown() {
         onClose={closeDropdown}
         className="absolute right-0 mt-[17px] flex w-[260px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark"
       >
-        <div>
-          <span className="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
-            Musharof Chowdhury
-          </span>
-          <span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
-            randomuser@pimjo.com
-          </span>
-        </div>
+        {(name || email) && (
+          <div>
+            {name && (
+              <span className="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
+                {name}
+              </span>
+            )}
+            {email && (
+              <span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
+                {email}
+              </span>
+            )}
+          </div>
+        )}
 
         <ul className="flex flex-col gap-1 pt-4 pb-3 border-b border-gray-200 dark:border-gray-800">
           <li>

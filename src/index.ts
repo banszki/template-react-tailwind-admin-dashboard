@@ -8,7 +8,7 @@ export { default as AppLayout } from "./layout/AppLayout";
 // Providers + hooks
 export { ThemeProvider, useTheme } from "./context/ThemeContext";
 export { SiteConfigProvider, useSiteConfig } from "./context/SiteConfigContext";
-export type { SiteConfig, NavItem } from "./context/SiteConfigContext";
+export type { SiteConfig, NavItem, SiteUser } from "./context/SiteConfigContext";
 export { useModal } from "./hooks/useModal";
 export { default as useGoBack } from "./hooks/useGoBack";
 
